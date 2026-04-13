@@ -1,0 +1,11 @@
+data/
+src/assets/
+src/status_report.md
+.idea
+src/__pycache__
+.env
+silver_report.md
+assets
+.user.yml
+logs
+instrucoes_dbt.md

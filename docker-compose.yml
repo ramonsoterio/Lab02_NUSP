@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  olist_db:
+    image: postgres:15-alpine
+    container_name: olist_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: olist_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d olist_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - data_pipeline
+
+  ingestion:
+    build: .
+    container_name: olist_ingestion
+    volumes:
+      - .:/app
+    environment:
+      - DB_URL=postgresql://admin:admin@olist_db:5432/olist_db
+    depends_on:
+      olist_db:
+        condition: service_healthy
+    command: python main.py
+    networks:
+      - data_pipeline
+
+  dbt_transform:
+    build: .
+    container_name: olist_dbt
+    working_dir: /app/dbt_project
+    volumes:
+      - .:/app
+    environment:
+      - DBT_PROFILES_DIR=/app/dbt_project
+      - DBT_DB_HOST=${DBT_DB_HOST}
+      - DBT_DB_USER=${DBT_DB_USER}
+      - DBT_DB_PASS=${DBT_DB_PASS}
+      - DBT_DB_PORT=${DBT_DB_PORT}
+    depends_on:
+      ingestion:
+        condition: service_completed_successfully
+    command: >
+      sh -c "dbt run && dbt test"
+    networks:
+      - data_pipeline
+
+  dbt_docs:
+      build: .
+      container_name: olist_dbt_docs
+      working_dir: /app/dbt_project
+      volumes:
+        - .:/app
+      environment:
+        - DBT_PROFILES_DIR=/app/dbt_project
+        - DBT_DB_HOST=${DBT_DB_HOST}
+        - DBT_DB_USER=${DBT_DB_USER}
+        - DBT_DB_PASS=${DBT_DB_PASS}
+        - DBT_DB_PORT=${DBT_DB_PORT}
+      ports:
+        - "8080:8080"
+      depends_on:
+        dbt_transform:
+          condition: service_completed_successfully
+      command: >
+        sh -c "dbt docs generate && dbt docs serve --port 8080 --host 0.0.0.0"
+      networks:
+        - data_pipeline
+  metabase:
+    image: metabase/metabase:latest
+    container_name: olist_bi
+    ports:
+      - "3000:3000"
+    depends_on:
+      olist_db:
+        condition: service_healthy
+      dbt_transform:
+        condition: service_completed_successfully
+    networks:
+      - data_pipeline
+    restart: always
+
+networks:
+  data_pipeline:
+    driver: bridge

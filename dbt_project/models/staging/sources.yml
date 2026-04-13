@@ -1,0 +1,112 @@
+version: 2
+
+sources:
+  - name: olist_raw
+    description: "Camada de ingestão contendo os arquivos CSV originais da Olist carregados via script Python."
+    schema: raw
+    loader: download.py
+
+    tables:
+      - name: orders
+        description: "Tabela de pedidos realizados na Olist."
+        columns:
+          - name: order_id
+            description: "Identificador único do pedido."
+            tests:
+              - unique
+              - not_null
+
+          - name: customer_id
+            description: "Chave estrangeira para a tabela de clientes (customer). Nota: Cada pedido tem um customer_id único no dataset da Olist."
+            tests:
+              - not_null
+
+          - name: order_status
+            description: "Status do ciclo de vida do pedido (ex: delivered, shipped, canceled)."
+            tests:
+              - accepted_values:
+                  values: ['delivered', 'shipped', 'canceled', 'invoiced', 'processing', 'approved', 'unavailable', 'created']
+                  quote: true
+
+          - name: order_purchase_timestamp
+            description: "Data e hora em que o pedido foi realizado."
+            tests:
+              - not_null
+
+          - name: order_approved_at
+            description: "Data e hora da aprovação do pagamento."
+
+          - name: order_delivered_carrier_date
+            description: "Data e hora em que o pedido foi entregue à transportadora."
+
+          - name: order_delivered_customer_date
+            description: "Data e hora da entrega final ao cliente. Pode ser nulo se o pedido não foi entregue."
+
+          - name: order_estimated_delivery_date
+            description: "Data de entrega estimada informada ao cliente no momento da compra."
+
+      - name: order_items
+        description: "Detalhes de itens por pedido, incluindo preços e frete."
+        columns:
+          - name: order_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source('olist_raw', 'orders')
+                  field: order_id
+          - name: order_item_id
+            description: "Sequencial do item dentro do mesmo pedido."
+          - name: price
+            description: "Valor unitário do item (ainda como texto)."
+
+      - name: products
+        description: "Catálogo de produtos e suas dimensões físicas."
+        columns:
+          - name: product_id
+            tests:
+              - unique
+              - not_null
+          - name: product_category_name
+            description: "Categoria em português."
+
+      - name: customers
+        description: "Informações de localização dos clientes."
+        columns:
+          - name: customer_id
+            tests:
+              - unique
+              - not_null
+          - name: customer_unique_id
+            description: "ID persistente do cliente (um cliente pode ter vários customer_id de compras diferentes)."
+
+      - name: sellers
+        description: "Dados dos vendedores da plataforma."
+        columns:
+          - name: seller_id
+            tests:
+              - unique
+              - not_null
+
+      - name: order_payments
+        description: "Métodos de pagamento e parcelamento usados nos pedidos."
+        columns:
+          - name: order_id
+          - name: payment_type
+            tests:
+              - accepted_values:
+                  values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'not_defined']
+
+      - name: order_reviews
+        description: "Avaliações deixadas pelos clientes após a compra."
+        columns:
+          - name: review_id
+          - name: review_score
+            tests:
+              - accepted_values:
+                  values: ['1', '2', '3', '4', '5']
+
+      - name: geolocation
+        description: "Mapeamento de prefixos de CEP para coordenadas de latitude e longitude."
+
+      - name: product_category_name_translation
+        description: "De-para de nomes de categoria de português para inglês."
