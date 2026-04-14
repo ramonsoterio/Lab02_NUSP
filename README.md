@@ -44,3 +44,6 @@ Essa camada traz os dados mais relevantes para o negócio.
 No banco de dados, os dados dessa camada são armazenados no schema `gold`. 
 
 ![img_1.png](assets/gold_schema.png)
+
+### Gráfico de lineage
+![img.png](assets/lineage.png)
